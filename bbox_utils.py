@@ -34,10 +34,7 @@ def actor_bbox_lidar(actor_list, camera, image, lidar_image, max_dist, min_detec
             bbox_save.append((class_id, x_center, y_center, width, height))
     return bbox_draw, bbox_save
 
-def actor_bbox_semantic():
-    pass
-
-def actor_bbox_depth_semantic(actor_list, camera, image, depth_image, semantic_image, max_dist, depth_margin, patch_ratio, resize_ratio, class_id):
+def actor_bbox_depth(actor_list, camera, image, depth_image, max_dist, depth_margin, patch_ratio, resize_ratio, class_id):
     bbox_draw = []
     bbox_save = []
     filtered_out, _ = cva_utils.auto_annotate(
@@ -46,9 +43,7 @@ def actor_bbox_depth_semantic(actor_list, camera, image, depth_image, semantic_i
         depth_image,
         max_dist=max_dist,
         depth_margin=depth_margin,
-    )
-
-    semantic_img = np.reshape(np.copy(semantic_image.raw_data), (semantic_image.height, semantic_image.width, 4))   
+    )  
 
     for npc, bbox in zip(filtered_out['vehicles'], filtered_out['bbox']):
         u1 = int(bbox[0,0])
@@ -67,13 +62,61 @@ def actor_bbox_depth_semantic(actor_list, camera, image, depth_image, semantic_i
 
     return bbox_draw, bbox_save
 
+def actor_bbox_depth_semantic(
+    actor_list, 
+    camera, 
+    image, 
+    depth_image, 
+    semantic_image, 
+    max_dist, 
+    depth_margin, 
+    patch_ratio, 
+    resize_ratio, 
+    semantic_threshold, 
+    semantic_label, 
+    class_id
+):
+    bbox_draw = []
+    bbox_save = []
+    filtered_out, _ = cva_utils.auto_annotate(
+        actor_list, 
+        camera, 
+        depth_image,
+        max_dist=max_dist,
+        depth_margin=depth_margin,
+    )
 
-def object_bbox_depth_semantic(bbox_list, camera, image, depth_image, semantic_image, vehicle, max_dist, class_id):
+    semantic_img = np.reshape(np.copy(semantic_image.raw_data), (semantic_image.height, semantic_image.width, 4))   
+
+    for npc, bbox in zip(filtered_out['vehicles'], filtered_out['bbox']):
+        u1 = int(bbox[0,0])
+        v1 = int(bbox[0,1])
+        u2 = int(bbox[1,0])
+        v2 = int(bbox[1,1])
+
+        # Get the per-pixel semantic labels inside the bounding box
+        semantic_bb = np.array(semantic_img[v1:v2+1,u1:u2+1,2])
+        sem_patch = np.array(semantic_bb == semantic_label)
+        s2 = np.sum(sem_patch) >= semantic_bb.shape[0] * semantic_bb.shape[1] * semantic_threshold
+
+        # Passes semantic test
+        if s2:
+            x_center = ((bbox[0,0] + bbox[1,0])/2) / image.width
+            y_center = ((bbox[0,1] + bbox[1,1])/2) / image.height
+            width = (bbox[1,0] - bbox[0,0]) / image.width
+            height = (bbox[1,1] - bbox[0,1]) / image.height
+
+            if np.max([x_center, y_center, width, height]) <= 1.0 and np.min([x_center, y_center, width, height]) >= 0.0:
+                bbox_draw.append((u1,v1,u2,v2))
+                bbox_save.append((class_id, x_center, y_center, width, height))
+
+    return bbox_draw, bbox_save
+
+def object_bbox_depth(bbox_list, camera, image, depth_image, vehicle, max_dist, class_id):
     bbox_draw = []
     bbox_save = []
     K = img_utils.build_projection_matrix(image.width, image.height, image.fov) 
     world_2_camera = np.array(camera.get_transform().get_inverse_matrix())
-    semantic_img = np.reshape(np.copy(semantic_image.raw_data), (semantic_image.height, semantic_image.width, 4))
     for bb in bbox_list:
 
         # Filter for distance from ego vehicle
@@ -131,20 +174,18 @@ def object_bbox_depth_semantic(bbox_list, camera, image, depth_image, semantic_i
                     y_center = ((y_min + y_max) / 2) / image.height
                     width = (x_max - x_min) / image.width
                     height = (y_max - y_min) / image.height
-                    print(np.max([x_center, y_center, width, height]), np.min([x_center, y_center, width, height]))
                     if np.max([x_center, y_center, width, height]) <= 1.0 and np.min([x_center, y_center, width, height]) >= 0.0:
                         bbox_draw.append((x_min,y_min,x_max,y_max))
                         bbox_save.append((class_id, x_center, y_center, width, height))
 
     return bbox_draw, bbox_save
 
-def object_bbox_semantic(bbox_list, camera, image, semantic_image, vehicle, max_dist, semantic_threshold, semantic_label, class_id):
+def object_bbox_depth_semantic(bbox_list, camera, image, depth_image, semantic_image, vehicle, max_dist, semantic_threshold, semantic_label, class_id):
     bbox_draw = []
     bbox_save = []
     K = img_utils.build_projection_matrix(image.width, image.height, image.fov) 
     world_2_camera = np.array(camera.get_transform().get_inverse_matrix())
     semantic_img = np.reshape(np.copy(semantic_image.raw_data), (semantic_image.height, semantic_image.width, 4))
-    t = 0
     for bb in bbox_list:
 
         # Filter for distance from ego vehicle
@@ -191,23 +232,27 @@ def object_bbox_semantic(bbox_list, camera, image, semantic_image, vehicle, max_
                 v1 = yc-hp
                 v2 = yc+hp
 
-                # Get the per-pixel semantic labels inside the bounding box
-                semantic_bb = np.array(semantic_img[v1:v2+1,u1:u2+1,2])
-                print(semantic_bb)
-                sem_patch = np.array(semantic_bb == semantic_label)
-                s = np.sum(sem_patch) >= semantic_bb.shape[0] * semantic_bb.shape[1] * semantic_threshold
+                depth_bb = np.array(depth_image[v1:v2+1,u1:u2+1])                    
+                    
+                dist_delta_new = np.full(depth_bb.shape, dist - 10)
+                s_patch = np.array(depth_bb > dist_delta_new)
+                s = np.sum(s_patch) > s_patch.shape[0]*0.1
 
+                # Passes depth test
                 if s:
-                    # print("Success!")
-                    x_center = ((x_min + x_max) / 2) / image.width
-                    y_center = ((y_min + y_max) / 2) / image.height
-                    width = (x_max - x_min) / image.width
-                    height = (y_max - y_min) / image.height
-                    print(np.max([x_center, y_center, width, height]), np.min([x_center, y_center, width, height]))
-                    if np.max([x_center, y_center, width, height]) <= 1.0 and np.min([x_center, y_center, width, height]) >= 0.0:
-                        # print("Saving...")
-                        bbox_draw.append((x_min,y_min,x_max,y_max))
-                        bbox_save.append((class_id, x_center, y_center, width, height))
-    
-    # print("NUM CAND | DETECTS", t, len(bbox_draw))
+                    # Get the per-pixel semantic labels inside the bounding box
+                    semantic_bb = np.array(semantic_img[v1:v2+1,u1:u2+1,2])
+                    sem_patch = np.array(semantic_bb == semantic_label)
+                    s2 = np.sum(sem_patch) >= semantic_bb.shape[0] * semantic_bb.shape[1] * semantic_threshold
+
+                    # Passes semantic test
+                    if s2:
+                        x_center = ((x_min + x_max) / 2) / image.width
+                        y_center = ((y_min + y_max) / 2) / image.height
+                        width = (x_max - x_min) / image.width
+                        height = (y_max - y_min) / image.height
+                        if np.max([x_center, y_center, width, height]) <= 1.0 and np.min([x_center, y_center, width, height]) >= 0.0:
+                            bbox_draw.append((x_min,y_min,x_max,y_max))
+                            bbox_save.append((class_id, x_center, y_center, width, height))
+
     return bbox_draw, bbox_save

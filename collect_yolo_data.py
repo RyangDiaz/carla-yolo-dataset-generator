@@ -123,6 +123,8 @@ def main(args):
             pedestrians_raw = world.get_actors().filter('*pedestrian*')
             pedestrians = cva_utils.snap_processing(pedestrians_raw, snap)
             depth_meter = cva_utils.extract_depth(depth_image)
+
+            # Refer to https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera for semantic labels
             walker_bbox_draw, walker_bbox_save = bbox_utils.actor_bbox_depth_semantic(
                 actor_list=pedestrians, 
                 camera=camera, 
@@ -130,10 +132,12 @@ def main(args):
                 semantic_image=semantic_image,
                 depth_image=depth_meter,
                 max_dist=40, 
-                depth_margin=10, 
-                patch_ratio=0.5, 
+                depth_margin=8, 
+                patch_ratio=0.4, 
                 resize_ratio=0.5, 
-                class_id=2
+                semantic_threshold=0.3,
+                semantic_label=12,
+                class_id=1
             )
             bbox_draw.extend(walker_bbox_draw)
             bbox_save.extend(walker_bbox_save)
@@ -142,27 +146,29 @@ def main(args):
             
             traffic_lights = world.get_level_bbs(carla.CityObjectLabel.TrafficLight)
             depth_meter = cva_utils.extract_depth(depth_image)
-            # tl_bbox_draw, tl_bbox_save = bbox_utils.object_bbox_depth_semantic(
-            #     bbox_list=traffic_lights, 
-            #     camera=camera, 
-            #     image=image,
-            #     semantic_image=semantic_image,
-            #     depth_image=depth_meter, 
-            #     vehicle=vehicle, 
-            #     max_dist=30, 
-            #     class_id=3
-            # )
-            tl_bbox_draw, tl_bbox_save = bbox_utils.object_bbox_semantic(
+            tl_bbox_draw, tl_bbox_save = bbox_utils.object_bbox_depth_semantic(
                 bbox_list=traffic_lights, 
                 camera=camera, 
                 image=image,
                 semantic_image=semantic_image,
+                depth_image=depth_meter, 
                 vehicle=vehicle, 
-                max_dist=30,
+                max_dist=30, 
                 semantic_threshold=0.5,
-                semantic_label=18,
-                class_id=3
+                semantic_label=7,
+                class_id=2
             )
+            # tl_bbox_draw, tl_bbox_save = bbox_utils.object_bbox_semantic(
+            #     bbox_list=traffic_lights, 
+            #     camera=camera, 
+            #     image=image,
+            #     semantic_image=semantic_image,
+            #     vehicle=vehicle, 
+            #     max_dist=30,
+            #     semantic_threshold=0.5,
+            #     semantic_label=7,
+            #     class_id=3
+            # )
             bbox_draw.extend(tl_bbox_draw)
             bbox_save.extend(tl_bbox_save)
 
@@ -170,27 +176,29 @@ def main(args):
             # Getting traffic sign bounding boxes
             traffic_signs = world.get_level_bbs(carla.CityObjectLabel.TrafficSigns)
             depth_meter = cva_utils.extract_depth(depth_image)
-            # ts_bbox_draw, ts_bbox_save = bbox_utils.object_bbox_depth_semantic(
-            #     bbox_list=traffic_signs, 
-            #     camera=camera, 
-            #     image=image,
-            #     semantic_image=semantic_image,
-            #     depth_image=depth_meter, 
-            #     vehicle=vehicle, 
-            #     max_dist=20, 
-            #     class_id=4
-            # )
-            ts_bbox_draw, ts_bbox_save = bbox_utils.object_bbox_semantic(
+            ts_bbox_draw, ts_bbox_save = bbox_utils.object_bbox_depth_semantic(
                 bbox_list=traffic_signs, 
                 camera=camera, 
                 image=image,
                 semantic_image=semantic_image,
+                depth_image=depth_meter, 
                 vehicle=vehicle, 
-                max_dist=30,
+                max_dist=25,
                 semantic_threshold=0.5,
-                semantic_label=12,
-                class_id=4
+                semantic_label=8,
+                class_id=3
             )
+            # ts_bbox_draw, ts_bbox_save = bbox_utils.object_bbox_semantic(
+            #     bbox_list=traffic_signs, 
+            #     camera=camera, 
+            #     image=image,
+            #     semantic_image=semantic_image,
+            #     vehicle=vehicle, 
+            #     max_dist=30,
+            #     semantic_threshold=0.5,
+            #     semantic_label=12,
+            #     class_id=4
+            # )
             bbox_draw.extend(ts_bbox_draw)
             bbox_save.extend(ts_bbox_save)
 
@@ -219,14 +227,14 @@ def main(args):
                     num_saved += 1
 
             # Show image with bounding box
-            # cv2.imshow('ImageWindowName',img)
-            # if cv2.waitKey(1) == ord('q'):
-            #     break
+            cv2.imshow('ImageWindowName',img)
+            if cv2.waitKey(1) == ord('q'):
+                break
     
             image_count += 1
 
 
-        # cv2.destroyAllWindows()
+        cv2.destroyAllWindows()
 
     finally:
         world.apply_settings(original_settings)

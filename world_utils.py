@@ -10,14 +10,14 @@ weather_presets = [
     carla.WeatherParameters.WetNoon,
     carla.WeatherParameters.WetCloudyNoon,
     carla.WeatherParameters.MidRainyNoon,
-    carla.WeatherParameters.HardRainNoon,
+    # carla.WeatherParameters.HardRainNoon,
     carla.WeatherParameters.SoftRainNoon,
     carla.WeatherParameters.ClearSunset,
     carla.WeatherParameters.CloudySunset,
     carla.WeatherParameters.WetSunset,
     carla.WeatherParameters.WetCloudySunset,
     carla.WeatherParameters.MidRainSunset,
-    carla.WeatherParameters.HardRainSunset,
+    # carla.WeatherParameters.HardRainSunset,
     carla.WeatherParameters.SoftRainSunset
 ]
 
@@ -43,8 +43,9 @@ def spawn_actors(client, world, num_vehicles, num_walkers):
     actor_list.append(vehicle)
 
     # generate npc vehicle
+    vehicle_bps = [x for x in bp_lib.filter('*vehicle*') if int(x.get_attribute('number_of_wheels')) == 4]
     for i in range(num_vehicles):
-        vehicle_npc = random.choice(bp_lib.filter('vehicle'))
+        vehicle_npc = random.choice(vehicle_bps)
         # vehicle_npc = bp_lib.find('vehicle.carlamotors.firetruck')
         npc = world.try_spawn_actor(vehicle_npc, random.choice(spawn_points))
 
