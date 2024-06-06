@@ -9,10 +9,10 @@ from queue import Queue
 from queue import Empty
 import numpy as np
 # from pascal_voc_writer import Writer
-import cva_utils
-import world_utils
-import img_utils
-import bbox_utils
+import utils.cva_utils as cva_utils
+import utils.world_utils as world_utils
+import utils.img_utils as img_utils
+import utils.bbox_utils as bbox_utils
 import argparse
 
 def retrieve_data(sensor_queue, frame, timeout=5):
