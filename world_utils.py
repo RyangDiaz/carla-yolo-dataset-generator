@@ -100,7 +100,7 @@ def spawn_actors(client, world, num_vehicles, num_walkers):
         else:
             walkers_list.append({"id": results[i].actor_id})
             walker_speed2.append(walker_speed[i])
-            print("Spawned pedestrian")
+            # print("Spawned pedestrian")
     walker_speed = walker_speed2
     # 3. we spawn the walker controller
     batch = []
@@ -197,7 +197,7 @@ def spawn_sensors(world, vehicle):
     print('LIDAR ready')
 
     # Spawn semantic segmentation camera
-    semantic_bp = bp_lib.find('sensor.camera.instance_segmentation')
+    semantic_bp = bp_lib.find('sensor.camera.semantic_segmentation')
     semantic_bp.set_attribute('fov','100')
     semantic = world.spawn_actor(semantic_bp, sensor_init_trans, attach_to=vehicle)
 

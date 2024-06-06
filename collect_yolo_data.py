@@ -12,6 +12,7 @@ import numpy as np
 import cva_utils
 import world_utils
 import img_utils
+import bbox_utils
 import argparse
 
 def retrieve_data(sensor_queue, frame, timeout=5):
@@ -25,8 +26,9 @@ def retrieve_data(sensor_queue, frame, timeout=5):
 
 def main(args):
     output_path = args.output_path
-    if not os.path.exists(output_path): 
-        os.makedirs(output_path)
+    if args.save:
+        if not os.path.exists(output_path): 
+            os.makedirs(output_path)
 
     # ==============================================
     # Set up CARLA world
@@ -56,28 +58,15 @@ def main(args):
         sensor_list, q_list, sensor_idxs = world_utils.spawn_sensors(world, vehicle)
         camera = sensor_list[0]
 
-        # Get the world to camera matrix
-        world_2_camera = np.array(camera.get_transform().get_inverse_matrix())
-
-        # Get the attributes from the camera
-        camera_bp = bp_lib.find('sensor.camera.rgb')
-        camera_bp.set_attribute('bloom_intensity','1')
-        camera_bp.set_attribute('fov','100')
-        image_w = camera_bp.get_attribute("image_size_x").as_int()
-        image_h = camera_bp.get_attribute("image_size_y").as_int()
-        fov = camera_bp.get_attribute("fov").as_float()
-
-        # Calculate the camera projection matrix to project from 3D -> 2D
-        K = img_utils.build_projection_matrix(image_w, image_h, fov)
-
         # TODO: Discard images with less than X labels
         image_count = 0
+        num_saved = 0
         save_every = 40
 
         weather_every = 80
         weather_tick = 20
 
-        while (not args.save) or (image_count // save_every < 50):
+        while (not args.save) or (num_saved < args.num_save):
             # Turn all traffic lights green
             for tl in world.get_actors().filter('*traffic_light*'):
                 tl.set_state(carla.TrafficLightState.Green)
@@ -106,19 +95,10 @@ def main(args):
 
             img = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
 
-            # Get the camera matrix 
-            world_2_camera = np.array(camera.get_transform().get_inverse_matrix())
-
-            # Save image
-            if args.save:
-                if image_count % save_every == 0:
-                    print("Saving image...")
-                    image.save_to_disk(os.path.join(output_path, map_name + '_' + '%06d.png' % image.frame))
-                    open(os.path.join(output_path, map_name + '_' + '%06d.txt' % image.frame), "a")
-
             boundingbox_path = os.path.join(output_path, "boundingbox")
-            if not os.path.exists(boundingbox_path): 
-                os.makedirs(boundingbox_path)
+            if args.save:
+                if not os.path.exists(boundingbox_path): 
+                    os.makedirs(boundingbox_path)
 
             bbox_draw = []
             bbox_save = []
@@ -147,13 +127,14 @@ def main(args):
                 actor_list=pedestrians, 
                 camera=camera, 
                 image=image,
-                depth_image=depth_meter, 
+                semantic_image=semantic_image,
+                depth_image=depth_meter,
                 max_dist=40, 
                 depth_margin=10, 
                 patch_ratio=0.5, 
                 resize_ratio=0.5, 
                 class_id=2
-            ):
+            )
             bbox_draw.extend(walker_bbox_draw)
             bbox_save.extend(walker_bbox_save)
 
@@ -161,13 +142,25 @@ def main(args):
             
             traffic_lights = world.get_level_bbs(carla.CityObjectLabel.TrafficLight)
             depth_meter = cva_utils.extract_depth(depth_image)
-            tl_bbox_draw, tl_bbox_save = bbox_utils.object_bbox_depth_semantic(
+            # tl_bbox_draw, tl_bbox_save = bbox_utils.object_bbox_depth_semantic(
+            #     bbox_list=traffic_lights, 
+            #     camera=camera, 
+            #     image=image,
+            #     semantic_image=semantic_image,
+            #     depth_image=depth_meter, 
+            #     vehicle=vehicle, 
+            #     max_dist=30, 
+            #     class_id=3
+            # )
+            tl_bbox_draw, tl_bbox_save = bbox_utils.object_bbox_semantic(
                 bbox_list=traffic_lights, 
                 camera=camera, 
-                image=image, 
-                depth_image=depth_meter, 
+                image=image,
+                semantic_image=semantic_image,
                 vehicle=vehicle, 
-                max_dist=30, 
+                max_dist=30,
+                semantic_threshold=0.5,
+                semantic_label=18,
                 class_id=3
             )
             bbox_draw.extend(tl_bbox_draw)
@@ -175,45 +168,71 @@ def main(args):
 
             
             # Getting traffic sign bounding boxes
-            
             traffic_signs = world.get_level_bbs(carla.CityObjectLabel.TrafficSigns)
             depth_meter = cva_utils.extract_depth(depth_image)
-            ts_bbox_draw, ts_bbox_save = bbox_utils.object_bbox_depth_semantic(
+            # ts_bbox_draw, ts_bbox_save = bbox_utils.object_bbox_depth_semantic(
+            #     bbox_list=traffic_signs, 
+            #     camera=camera, 
+            #     image=image,
+            #     semantic_image=semantic_image,
+            #     depth_image=depth_meter, 
+            #     vehicle=vehicle, 
+            #     max_dist=20, 
+            #     class_id=4
+            # )
+            ts_bbox_draw, ts_bbox_save = bbox_utils.object_bbox_semantic(
                 bbox_list=traffic_signs, 
                 camera=camera, 
-                image=image, 
-                depth_image=depth_meter, 
+                image=image,
+                semantic_image=semantic_image,
                 vehicle=vehicle, 
-                max_dist=30, 
+                max_dist=30,
+                semantic_threshold=0.5,
+                semantic_label=12,
                 class_id=4
             )
             bbox_draw.extend(ts_bbox_draw)
             bbox_save.extend(ts_bbox_save)
 
             # Now, draw bboxes and show images
+            annotation_str = ""
+            for bbox_d, bbox_s in zip(bbox_draw, bbox_save):
+                u1, v1, u2, v2 = bbox_d
+                class_id, x_center, y_center, width, height = bbox_s
 
+                img_utils.draw_boundingbox(img, u1, v1, u2, v2)
+                annotation_str += f"{class_id} {x_center} {y_center} {width} {height}\n"
+            
+            # Save image and labels if settings allow it
+            if args.save and image_count % save_every == 0:
+                if len(bbox_save) < args.num_detections_save:
+                    print("Minimum detections not reached, skipping...")
+                else:
+                    print("Saving image...")
+                    image.save_to_disk(os.path.join(output_path, args.map + '_' + '%06d.png' % image.frame))
+                    with open(os.path.join(output_path, args.map + '_' + '%06d.txt' % image.frame), "a") as f:
+                        f.write(annotation_str)
+                
+                    # Save image with bounding box
+                    output_file_path = os.path.join(boundingbox_path, args.map + '_' + '%06d_b.png' % image.frame)
+                    cv2.imwrite(output_file_path, img)
+                    num_saved += 1
 
             # Show image with bounding box
-            cv2.imshow('ImageWindowName',img)
-            # Save image with bounding box
-            if args.save:
-                if image_count % save_every == 0:
-                    output_file_path = os.path.join(boundingbox_path, map_name + '_' + '%06d_b.png' % image.frame)
-                    cv2.imwrite(output_file_path, img)
+            # cv2.imshow('ImageWindowName',img)
+            # if cv2.waitKey(1) == ord('q'):
+            #     break
+    
             image_count += 1
-            if cv2.waitKey(1) == ord('q'):
-                break
 
-            # (PASCAL VOC format) Save the bounding boxes in the scene
-            # writer.save(os.path.join(output_path, '%06d.xml' % image.frame))
 
-        cv2.destroyAllWindows()
+        # cv2.destroyAllWindows()
 
     finally:
         world.apply_settings(original_settings)
         print('destroying actors')
-        client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
-        client.apply_batch([carla.command.DestroyActor(x) for x in walkers_list])
+        # client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
+        # client.apply_batch([carla.command.DestroyActor(x) for x in walkers_list])
         for sensor in sensor_list:
             sensor.destroy()
         print('done.')
@@ -259,6 +278,13 @@ if __name__ == '__main__':
         type=int,
         default=50,
         help='Number of images to save for this run.'
+    )
+
+    parser.add_argument(
+        '--num_detections_save',
+        type=int,
+        default=1,
+        help='Minimum number of detections per collected datapoint'
     )
 
     args = parser.parse_args()

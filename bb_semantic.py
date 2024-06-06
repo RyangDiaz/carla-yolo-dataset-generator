@@ -616,7 +616,7 @@ def main():
 
 
             # Show image with bounding box
-            cv2.imshow('ImageWindowName',img)
+            # cv2.imshow('ImageWindowName',img)
             # Save image with bounding box
             if write_files:
                 if image_count % save_every == 0:
