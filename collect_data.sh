@@ -7,6 +7,6 @@ do
             --map $MAP \
             --save \
             --num_save 50 \
-            --num_detections_save 3
+            --num_detections_save 2
     done
 done
