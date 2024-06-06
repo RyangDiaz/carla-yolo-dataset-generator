@@ -23,6 +23,15 @@ import cv2
 import carla
 
 
+def retrieve_data(sensor_queue, frame, timeout=5):
+    while True:
+        try:
+            data = sensor_queue.get(True,timeout)
+        except Empty:
+            return None
+        if data.frame == frame:
+            return data
+
 ### PART 0
 ### Calculate bounding boxes and apply the filter ###
 #####################################################

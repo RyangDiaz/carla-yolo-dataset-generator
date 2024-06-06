@@ -11,6 +11,7 @@ import numpy as np
 # from pascal_voc_writer import Writer
 import bbox_filter as cva
 import cva_utils
+import argparse
 
 weather_presets = [
     carla.WeatherParameters.ClearNoon,
@@ -70,9 +71,14 @@ def draw_boundingbox(img, x_min, y_min, x_max, y_max, color=(0,0,255,255)):
     cv2.line(img, (int(x_max),int(y_min)), (int(x_max),int(y_max)), color, 1)
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--map', type=str, default='Town01')
+
+    args = parser.parse_args()
+
     vehicle_num = 70
     walker_num = 150
-    map_name = 'Town03'
+    map_name = args.map
     actor_list = []
     sensor_list = []
     walkers_list = []
@@ -84,7 +90,7 @@ def main():
     world  = client.get_world()
     original_settings = world.get_settings()
 
-    write_files = False
+    write_files = True
 
     try:
 
@@ -313,15 +319,16 @@ def main():
         bike_list = ["vehicle.bh.crossbike", "vehicle.diamondback.century", "vehicle.gazelle.omafiets"]
         emergency_list = ["vehicle.dodge.charger_police", "vehicle.dodge.charger_police_2020", "vehicle.carlamotors.firetruck", "vehicle.ford.ambulance"]
 
-        weather_every = 20
-        weather_tick = 0
-        while True:
+        weather_every = 80
+        weather_tick = 20
+        while image_count // save_every < 50:
             # Turn all traffic lights green
             for tl in world.get_actors().filter('*traffic_light*'):
                 tl.set_state(carla.TrafficLightState.Green)
             
             # Change weather
             if weather_tick == 0:
+                print("Changing weather...")
                 world.set_weather(random.choice(weather_presets))
             weather_tick = (weather_tick + 1) % weather_every
 
@@ -349,6 +356,7 @@ def main():
             # Save image
             if write_files:
                 if image_count % save_every == 0:
+                    print("Saving image...")
                     image.save_to_disk(os.path.join(output_path, map_name + '_' + '%06d.png' % image.frame))
                     # depth_image.save_to_disk(os.path.join(output_path, '%06d_d.png' % image.frame), depth_color_converter)
                     open(os.path.join(output_path, map_name + '_' + '%06d.txt' % image.frame), "a")
@@ -393,10 +401,8 @@ def main():
 
                     if npc.type_id in bike_list or npc.type_id in motorcycle_list:
                         class_id = 0
-                    elif npc.type_id in emergency_list:
-                        class_id = 1
                     else:
-                        class_id = 2
+                        class_id = 1
 
                     annotation_str += f"{class_id} {x_center} {y_center} {width} {height}\n"
                     # print("VEHICLES", annotation_str[0])
@@ -436,7 +442,7 @@ def main():
 
                     draw_boundingbox(img, u1, v1, u2, v2, color=(255,165,0,255))
 
-                    class_id = 3
+                    class_id = 2
 
                     annotation_str += f"{class_id} {x_center} {y_center} {width} {height}\n"
                     # print("VEHICLES", annotation_str[0])
@@ -515,7 +521,7 @@ def main():
                             draw_boundingbox(img, u1, v1, u2, v2, color=(0,255,0,255))
 
                             if x_min > 0 and x_max < image_w and y_min > 0 and y_max < image_h: 
-                                class_id = 4
+                                class_id = 3
                                 x_center = ((x_min + x_max) / 2) / image_w
                                 y_center = ((y_min + y_max) / 2) / image_h
                                 width = (x_max - x_min) / image_w
@@ -596,7 +602,7 @@ def main():
                             draw_boundingbox(img, u1, v1, u2, v2, color=(0,0,0,255))
 
                             if x_min > 0 and x_max < image_w and y_min > 0 and y_max < image_h: 
-                                class_id = 5
+                                class_id = 4
                                 x_center = ((x_min + x_max) / 2) / image_w
                                 y_center = ((y_min + y_max) / 2) / image_h
                                 width = (x_max - x_min) / image_w
