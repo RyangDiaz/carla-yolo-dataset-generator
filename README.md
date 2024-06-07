@@ -6,7 +6,7 @@ This repository provides some useful tools to generate a dataset of annotated im
 
 ## Overview
 
-[Installation](## Installation)
+[Installation](##-Installation)
 
 ## Installation
 
