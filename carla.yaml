@@ -1,0 +1,10 @@
+path: carla_dataset
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: vehicle
+  1: pedestrian
+  2: traffic_light
+  3: traffic_sign

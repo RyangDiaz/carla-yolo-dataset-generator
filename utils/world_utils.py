@@ -137,7 +137,7 @@ def spawn_actors(client, world, num_vehicles, num_walkers):
     return actor_list, walkers_list, all_id
 
 
-def spawn_sensors(world, vehicle):
+def spawn_sensors(world, vehicle, inference=False):
     bp_lib = world.get_blueprint_library()
     sensor_list = []
     q_list = []
@@ -166,48 +166,49 @@ def spawn_sensors(world, vehicle):
     idx = idx+1
     print('RGB camera ready')
 
-    # Spawn depth camera
-    depth_bp = world.get_blueprint_library().find('sensor.camera.depth')
-    depth_bp.set_attribute('fov','100')
-    depth = world.spawn_actor(depth_bp, sensor_init_trans, attach_to=vehicle)
+    if not inference:
+        # Spawn depth camera
+        depth_bp = world.get_blueprint_library().find('sensor.camera.depth')
+        depth_bp.set_attribute('fov','100')
+        depth = world.spawn_actor(depth_bp, sensor_init_trans, attach_to=vehicle)
 
-    depth_queue = Queue()
-    depth.listen(depth_queue.put)
-    sensor_list.append(depth)
-    q_list.append(depth_queue)
-    sensor_idxs['depth'] = idx
-    idx = idx+1
-    print('Depth camera ready')
+        depth_queue = Queue()
+        depth.listen(depth_queue.put)
+        sensor_list.append(depth)
+        q_list.append(depth_queue)
+        sensor_idxs['depth'] = idx
+        idx = idx+1
+        print('Depth camera ready')
 
-    # Spawn LIDAR sensor
-    lidar_bp = world.get_blueprint_library().find('sensor.lidar.ray_cast_semantic')
-    lidar_bp.set_attribute('channels', '64')
-    lidar_bp.set_attribute('points_per_second', '1120000')
-    lidar_bp.set_attribute('upper_fov', '40')
-    lidar_bp.set_attribute('lower_fov', '-40')
-    lidar_bp.set_attribute('range', '100')
-    lidar_bp.set_attribute('rotation_frequency', '40')
-    lidar = world.spawn_actor(lidar_bp, sensor_init_trans, attach_to=vehicle)
+        # Spawn LIDAR sensor
+        lidar_bp = world.get_blueprint_library().find('sensor.lidar.ray_cast_semantic')
+        lidar_bp.set_attribute('channels', '64')
+        lidar_bp.set_attribute('points_per_second', '1120000')
+        lidar_bp.set_attribute('upper_fov', '40')
+        lidar_bp.set_attribute('lower_fov', '-40')
+        lidar_bp.set_attribute('range', '100')
+        lidar_bp.set_attribute('rotation_frequency', '40')
+        lidar = world.spawn_actor(lidar_bp, sensor_init_trans, attach_to=vehicle)
 
-    lidar_queue = Queue()
-    lidar.listen(lidar_queue.put)
-    sensor_list.append(lidar)
-    q_list.append(lidar_queue)
-    sensor_idxs['lidar'] = idx
-    idx = idx+1
-    print('LIDAR ready')
+        lidar_queue = Queue()
+        lidar.listen(lidar_queue.put)
+        sensor_list.append(lidar)
+        q_list.append(lidar_queue)
+        sensor_idxs['lidar'] = idx
+        idx = idx+1
+        print('LIDAR ready')
 
-    # Spawn semantic segmentation camera
-    semantic_bp = bp_lib.find('sensor.camera.semantic_segmentation')
-    semantic_bp.set_attribute('fov','100')
-    semantic = world.spawn_actor(semantic_bp, sensor_init_trans, attach_to=vehicle)
+        # Spawn semantic segmentation camera
+        semantic_bp = bp_lib.find('sensor.camera.semantic_segmentation')
+        semantic_bp.set_attribute('fov','100')
+        semantic = world.spawn_actor(semantic_bp, sensor_init_trans, attach_to=vehicle)
 
-    semantic_queue = Queue()
-    semantic.listen(semantic_queue.put)
-    sensor_list.append(semantic)
-    q_list.append(semantic_queue)
-    sensor_idxs['semantic'] = idx
-    idx = idx+1
-    print('Semantic camera ready')
+        semantic_queue = Queue()
+        semantic.listen(semantic_queue.put)
+        sensor_list.append(semantic)
+        q_list.append(semantic_queue)
+        sensor_idxs['semantic'] = idx
+        idx = idx+1
+        print('Semantic camera ready')
 
     return sensor_list, q_list, sensor_idxs
