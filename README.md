@@ -9,8 +9,8 @@ This repository provides some useful tools to generate a dataset of annotated im
 [Installation](#Installation)<br/>
 [Usage](#Usage)<br/>
 - [Quick Start](#Quick-Start)<br/>
-- [Dataset Customization](#Dataset-Customization)
-[Acknowledgements](#Acknowledgements)<br/>
+- [Dataset Customization](#Dataset-Customization)<br/>
+[Acknowledgements](#Acknowledgements)
 
 ## Installation
 
