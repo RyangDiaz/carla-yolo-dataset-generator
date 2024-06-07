@@ -7,6 +7,10 @@ This repository provides some useful tools to generate a dataset of annotated im
 ## Overview
 
 [Installation](#Installation)
+[Usage](#Usage)
+- [Quick Start](#Quick-Start)
+- [Dataset Customization](#Dataset-Customization)
+[Acknowledgements](#Acknowledgements)
 
 ## Installation
 
@@ -40,3 +44,9 @@ You can then run inference on the trained model over `NUM_STEPS` and visualize/s
 This trained detector currently has four classes: `vehicle`, `pedestrian`, `traffic_light`, and `traffic_sign`
 
 ### Dataset Customization
+
+**Adding New Classes**
+
+**Dataset Collection Parameters**
+
+### Acknowledgements
