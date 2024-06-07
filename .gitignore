@@ -1,4 +1,7 @@
 */__pycache__/
 carla_data/
-image/
-DAG/
+datasets*/
+runs/
+*.mp4
+*.pt
+

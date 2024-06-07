@@ -36,6 +36,7 @@ def main(args):
 
     client = carla.Client('localhost', 2000)
     client.set_timeout(5.0)
+    print("Loading world", args.map)
     client.load_world(args.map)
     world  = client.get_world()
     original_settings = world.get_settings()
@@ -72,7 +73,7 @@ def main(args):
                 tl.set_state(carla.TrafficLightState.Green)
             
             # Change weather
-            if weather_tick == 0:
+            if weather_tick == 0 and not args.constant_weather:
                 print("Changing weather...")
                 world.set_weather(random.choice(world_utils.weather_presets))
             weather_tick = (weather_tick + 1) % weather_every
@@ -143,7 +144,6 @@ def main(args):
             bbox_save.extend(walker_bbox_save)
 
             # Getting traffic light bounding boxes
-            
             traffic_lights = world.get_level_bbs(carla.CityObjectLabel.TrafficLight)
             depth_meter = cva_utils.extract_depth(depth_image)
             tl_bbox_draw, tl_bbox_save = bbox_utils.object_bbox_depth_semantic(
@@ -158,17 +158,7 @@ def main(args):
                 semantic_label=7,
                 class_id=2
             )
-            # tl_bbox_draw, tl_bbox_save = bbox_utils.object_bbox_semantic(
-            #     bbox_list=traffic_lights, 
-            #     camera=camera, 
-            #     image=image,
-            #     semantic_image=semantic_image,
-            #     vehicle=vehicle, 
-            #     max_dist=30,
-            #     semantic_threshold=0.5,
-            #     semantic_label=7,
-            #     class_id=3
-            # )
+
             bbox_draw.extend(tl_bbox_draw)
             bbox_save.extend(tl_bbox_save)
 
@@ -188,17 +178,6 @@ def main(args):
                 semantic_label=8,
                 class_id=3
             )
-            # ts_bbox_draw, ts_bbox_save = bbox_utils.object_bbox_semantic(
-            #     bbox_list=traffic_signs, 
-            #     camera=camera, 
-            #     image=image,
-            #     semantic_image=semantic_image,
-            #     vehicle=vehicle, 
-            #     max_dist=30,
-            #     semantic_threshold=0.5,
-            #     semantic_label=12,
-            #     class_id=4
-            # )
             bbox_draw.extend(ts_bbox_draw)
             bbox_save.extend(ts_bbox_save)
 
@@ -216,7 +195,8 @@ def main(args):
                 if len(bbox_save) < args.num_detections_save:
                     print("Minimum detections not reached, skipping...")
                 else:
-                    print("Saving image...")
+                    num_saved += 1
+                    print(f"Saving image {num_saved}")
                     image.save_to_disk(os.path.join(output_path, args.map + '_' + '%06d.png' % image.frame))
                     with open(os.path.join(output_path, args.map + '_' + '%06d.txt' % image.frame), "a") as f:
                         f.write(annotation_str)
@@ -224,12 +204,12 @@ def main(args):
                     # Save image with bounding box
                     output_file_path = os.path.join(boundingbox_path, args.map + '_' + '%06d_b.png' % image.frame)
                     cv2.imwrite(output_file_path, img)
-                    num_saved += 1
-
+                    
             # Show image with bounding box
-            cv2.imshow('ImageWindowName',img)
-            if cv2.waitKey(1) == ord('q'):
-                break
+            if args.show:
+                cv2.imshow('ImageWindowName',img)
+                if cv2.waitKey(1) == ord('q'):
+                    break
     
             image_count += 1
 
@@ -239,8 +219,8 @@ def main(args):
     finally:
         world.apply_settings(original_settings)
         print('destroying actors')
-        # client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
-        # client.apply_batch([carla.command.DestroyActor(x) for x in walkers_list])
+        client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
+        client.apply_batch([carla.command.DestroyActor(x) for x in walkers_list])
         for sensor in sensor_list:
             sensor.destroy()
         print('done.')
@@ -266,6 +246,18 @@ if __name__ == '__main__':
         type=int,
         default=150,
         help="Number of pedestrians spawned in simulation"
+    )
+
+    parser.add_argument(
+        '--constant_weather',
+        action='store_true',
+        help="Turns mid-simulation weather switching off during data collection"
+    )
+
+    parser.add_argument(
+        '--show',
+        action='store_true',
+        help='Shows annotations on screen during data collection'
     )
 
     parser.add_argument(

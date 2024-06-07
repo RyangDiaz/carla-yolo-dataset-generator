@@ -1,5 +1,5 @@
 # !/bin/bash
-for MAP in 'Town05' 'Town06' # 'Town01' 'Town02' 'Town03' 'Town04' 'Town05'
+for MAP in 'Town01' 'Town02' 'Town03' 'Town05' 'Town06HD'
 do
     for i in {1..5} 
     do
