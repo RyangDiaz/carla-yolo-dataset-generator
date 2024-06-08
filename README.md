@@ -26,6 +26,13 @@ Follow [these](https://carla.readthedocs.io/en/0.9.15/start_quickstart/) instruc
 git clone https://github.com/RyangDiaz/carla-yolo-dataset-generator.git
 cd carla-yolo-dataset-generator
 conda env create -f environment.yml
+conda activate carla
+```
+
+If not using conda, then
+
+```
+pip install -r requirements.txt
 ```
 
 ## Usage
@@ -57,6 +64,8 @@ You can modify the characteristics of your dataset by passing arguments to `coll
 - `--num_save {N}`: If `--save` is passed in, the dataset collector will run until `N` frames have been collected.
 - `--num_detections_save {N}`: Each collected frame will have a minimum of `N` bounding boxes (across all classes).
 
+After data collection, use `convert_dataset.py` to transform the collected dataset into a format compatible with the YOLO model trainer. Use `train_yolo.py` to run the training script.
+
 **Adding New Classes**
 
 To add new classes of actors/objects for annotation, modify the `collect_yolo_data.py` file by adding one of the functions from `utils/bbox_utils.py` depending on if your class involves actors or level objects in the CARLA simulation. Follow the pattern shown in `collect_yolo_data.py`. Additionally, be sure to modify the `carla.yaml` configuration file with your new classes/labels so that the YOLO model can predict them.
@@ -81,18 +90,18 @@ bbox_utils.actor_bbox_lidar(
 
 ```
 bbox_utils.actor_bbox_depth_semantic(
-    actor_list, 
-    camera, 
-    image,
-    semantic_image,
-    depth_image,
-    max_dist, 
-    depth_margin, 
-    patch_ratio, 
-    resize_ratio, 
-    semantic_threshold,
-    semantic_label,
-    class_id
+    actor_list, # List of filtered actors (probably from world.get_actors().filter('FILTER'))
+    camera, # RGB camera from environment
+    image, # carla.Image taken from RGB camera
+    semantic_image, # carla.Image taken from semantic segmentation camera
+    depth_image, # Depth reading in meters obtained from cva_utils.extract_depth(depth_image)
+    max_dist, # Maximum distance to annotate away from ego vehicle
+    depth_margin, # Argument for cva_utils.auto_annotate
+    patch_ratio, # Argument for cva_utils.auto_annotate_lidar
+    resize_ratio, # Argument for cva_utils.auto_annotate_lidar
+    semantic_label, # Integer semantic label from semantic_image corresponding to desired class
+    semantic_threshold, # Minimum semantic label threshold for bounding box filter
+    class_id # Integer label for YOLO classifier
 )
 ```
 
@@ -102,16 +111,16 @@ Bounding box filtering of non-occluded level objects (such as traffic lights and
 
 ```
 bbox_utils.object_bbox_depth_semantic(
-    bbox_list, 
-    camera, 
-    image,
-    semantic_image,
-    depth_image, 
-    vehicle, 
-    max_dist, 
-    semantic_threshold,
-    semantic_label,
-    class_id
+    bbox_list, # List of filtered bounding boxes (probably from world.get_level_bbs(FILTER))
+    camera, # RGB camera from environment
+    image, # carla.Image taken from RGB camera
+    semantic_image, # carla.Image taken from semantic segmentation camera
+    depth_image, # Depth reading in meters obtained from cva_utils.extract_depth(depth_image)
+    vehicle, # Ego vehicle from simulation
+    max_dist, # Maximum distance to annotate away from ego vehicle
+    semantic_label, # Integer semantic label from semantic_image corresponding to desired class
+    semantic_threshold, # Minimum semantic label threshold for bounding box filter
+    class_id # Integer label for YOLO classifier
 )
 ```
 

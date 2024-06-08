@@ -125,7 +125,6 @@ def main(args):
             pedestrians = cva_utils.snap_processing(pedestrians_raw, snap)
             depth_meter = cva_utils.extract_depth(depth_image)
 
-            # Refer to https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera for semantic labels
             walker_bbox_draw, walker_bbox_save = bbox_utils.actor_bbox_depth_semantic(
                 actor_list=pedestrians, 
                 camera=camera, 
@@ -136,8 +135,8 @@ def main(args):
                 depth_margin=8, 
                 patch_ratio=0.4, 
                 resize_ratio=0.5, 
-                semantic_threshold=0.3,
-                semantic_label=12,
+                semantic_label=12, # Refer to https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera for semantic labels
+                semantic_threshold=0.3, # The bounding box is included if at least 30% of the semantic labels inside are semantic_label
                 class_id=1
             )
             bbox_draw.extend(walker_bbox_draw)
