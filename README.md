@@ -57,9 +57,65 @@ You can modify the characteristics of your dataset by passing arguments to `coll
 - `--num_save {N}`: If `--save` is passed in, the dataset collector will run until `N` frames have been collected.
 - `--num_detections_save {N}`: Each collected frame will have a minimum of `N` bounding boxes (across all classes).
 
-<!-- **Adding New Classes**
+**Adding New Classes**
 
-Bounding box filtering of non-occluded actors (such as vehicles and pedestrians) can be done in two ways: lidar-based filtering or depth/semantic-based filtering: -->
+To add new classes of actors/objects for annotation, modify the `collect_yolo_data.py` file by adding one of the functions from `utils/bbox_utils.py` depending on if your class involves actors or level objects in the CARLA simulation. Follow the pattern shown in `collect_yolo_data.py`. Additionally, be sure to modify the `carla.yaml` configuration file with your new classes/labels so that the YOLO model can predict them.
+
+Bounding box filtering of non-occluded actors (such as vehicles and pedestrians) can be done in two ways: lidar-based filtering or depth/semantic-based filtering:
+
+*Lidar-Based Actor Bounding Box Filtering*
+
+```
+bbox_utils.actor_bbox_lidar(
+    actor_list, # List of filtered actors (probably from world.get_actors().filter('FILTER'))
+    camera, # RGB camera from environment
+    image, # carla.Image taken from RGB camera
+    lidar_image, # carla.SemanticLidarMeasurement taken from lidar sensor
+    max_dist, # Maximum distance to annotate away from ego vehicle
+    min_detect, # Argument for cva_utils.auto_annotate_lidar
+    class_id # Integer label for YOLO classifier
+)
+```
+
+*Semantic/Depth-Based Actor Bounding Box Filtering*
+
+```
+bbox_utils.actor_bbox_depth_semantic(
+    actor_list, 
+    camera, 
+    image,
+    semantic_image,
+    depth_image,
+    max_dist, 
+    depth_margin, 
+    patch_ratio, 
+    resize_ratio, 
+    semantic_threshold,
+    semantic_label,
+    class_id
+)
+```
+
+Bounding box filtering of non-occluded level objects (such as traffic lights and traffic signs) is done through depth/semantic-based filtering:
+
+*Semantic/Depth-Based Object Bounding Box Filtering*
+
+```
+bbox_utils.object_bbox_depth_semantic(
+    bbox_list, 
+    camera, 
+    image,
+    semantic_image,
+    depth_image, 
+    vehicle, 
+    max_dist, 
+    semantic_threshold,
+    semantic_label,
+    class_id
+)
+```
+
+For more information on the algorithms used to filter out bounding boxes, check out the [CARLA-2DDBBox](https://github.com/MukhlasAdib/CARLA-2DBBox) repository.
 
 ### Acknowledgements
 
