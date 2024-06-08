@@ -39,6 +39,10 @@ def main(args):
 
     try:
         while args.num_steps < 0 or current_step < args.num_steps:
+            # Turn all traffic lights green
+            for tl in world.get_actors().filter('*traffic_light*'):
+                tl.set_state(carla.TrafficLightState.Green)
+                
             # Retrieve the image
             nowFrame = world.tick()
 
@@ -71,6 +75,7 @@ def main(args):
                 del results
                 torch.cuda.empty_cache()
             current_step += 1
+            print("Current step", current_step)
 
     finally:
         if args.num_steps > 0 and args.save_video and len(predict_frames) > 0:
