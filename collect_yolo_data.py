@@ -16,6 +16,17 @@ import utils.bbox_utils as bbox_utils
 import utils.server_utils as server_utils
 import argparse
 
+def get_checkpoint():
+    num_save = 0
+    try:
+        with open('checkpoint.txt', 'r') as f:
+            num_save_ckpt = int(f.read().strip())
+        print("Loading checkpoint!")
+        return num_save_ckpt
+    except:
+        print("Checkpoint not found")
+    return num_save
+
 def retrieve_data(sensor_queue, frame, timeout=5):
     while True:
         try:
@@ -47,6 +58,14 @@ def main(args):
     world  = client.get_world()
     original_settings = world.get_settings()
 
+    image_count = 0
+    num_saved = get_checkpoint()
+    save_every = 40
+    stop_count = 0
+
+    weather_every = 80
+    weather_tick = 20
+
     try:
 
         bp_lib = world.get_blueprint_library()
@@ -65,18 +84,44 @@ def main(args):
         sensor_list, q_list, sensor_idxs = world_utils.spawn_sensors(world, vehicle)
         camera = sensor_list[0]
 
-        # TODO: Discard images with less than X labels
-        image_count = 0
-        num_saved = 0
-        save_every = 40
+        # Reset simulation if car is stuck
+        def reset():
+            # Destroy existing actors
+            world.apply_settings(original_settings)
+            print('destroying actors')
+            client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
+            client.apply_batch([carla.command.DestroyActor(x) for x in walkers_list])
+            for sensor in sensor_list:
+                sensor.destroy()
+    
+            # Respawn new actors
+            actor_list, walkers_list, all_id = world_utils.spawn_actors(client, world, args.num_vehicles, args.num_walkers)
+            vehicle = actor_list[0]
+            sensor_list, q_list, sensor_idxs = world_utils.spawn_sensors(world, vehicle)
+            camera = sensor_list[0]
 
-        weather_every = 80
-        weather_tick = 20
+            return actor_list, walkers_list, all_id, vehicle, sensor_list, q_list, sensor_idxs, camera
+
+        traffic_signs = world.get_level_bbs(carla.CityObjectLabel.TrafficSigns)
+        stop_signs = self.world.get_actors().filter('*stop*')
 
         while (not args.save) or (num_saved < args.num_save):
             # Turn all traffic lights green
-            for tl in world.get_actors().filter('*traffic_light*'):
-                tl.set_state(carla.TrafficLightState.Green)
+            # for tl in world.get_actors().filter('*traffic_light*'):
+            #     tl.set_state(carla.TrafficLightState.Green)
+
+            # Track vehicle velocity to ensure that car isn't stuck
+            velocity = vehicle.get_velocity()
+            velocity = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) # * 3.6
+            if velocity < 0.01:
+                stop_count += 1
+            else:
+                stop_count = 0
+
+            # Reset simulation if car is stuck
+            if stop_count == 120:
+                print("Car is stuck! Resetting...")
+                actor_list, walkers_list, all_id, vehicle, sensor_list, q_list, sensor_idxs, camera = reset()
             
             # Change weather
             if weather_tick == 0 and not args.constant_weather:
@@ -166,8 +211,7 @@ def main(args):
             bbox_draw.extend(tl_bbox_draw)
             bbox_save.extend(tl_bbox_save)
             
-            # Getting traffic sign bounding boxes
-            traffic_signs = world.get_level_bbs(carla.CityObjectLabel.TrafficSigns)
+            # Getting stop sign bounding boxes
             depth_meter = cva_utils.extract_depth(depth_image)
             ts_bbox_draw, ts_bbox_save = bbox_utils.object_bbox_depth_semantic(
                 bbox_list=traffic_signs, 
@@ -216,8 +260,16 @@ def main(args):
     
             image_count += 1
 
+        print('Data collection finished!')
+        if os.path.exists('checkpoint.txt'):
+            os.remove('checkpoint.txt')
 
         cv2.destroyAllWindows()
+    
+    except:
+        print('Simulation crashed, saving checkpoint!')
+        with open('checkpoint.txt', 'w') as f:
+            f.write(num_saved)
 
     finally:
         world.apply_settings(original_settings)
