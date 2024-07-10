@@ -36,7 +36,7 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-First, launch a CARLA server (depending on the method of installation). Launch a separate terminal session for the instructions specified below.
+First, modify the `LAUNCH_STRING` variable of `utils/server_utils.py` to the appropriate launch command so that the script can automatically launch a Carla server for you.
 
 ### Quick Start
 To automatically generate a dataset of 1250 images (800 train, 200 validation, 250 test) spanning five different maps (`Town01` to `Town05`) and train a YOLOv8 model on this dataset:

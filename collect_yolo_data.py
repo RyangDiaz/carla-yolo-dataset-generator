@@ -13,6 +13,7 @@ import utils.cva_utils as cva_utils
 import utils.world_utils as world_utils
 import utils.img_utils as img_utils
 import utils.bbox_utils as bbox_utils
+import utils.server_utils as server_utils
 import argparse
 
 def retrieve_data(sensor_queue, frame, timeout=5):
@@ -29,6 +30,11 @@ def main(args):
     if args.save:
         if not os.path.exists(output_path): 
             os.makedirs(output_path)
+    
+    # ==============================================
+    # Set up CARLA server
+    # ==============================================
+    server_utils.start_carla_server()
 
     # ==============================================
     # Set up CARLA world
@@ -119,7 +125,6 @@ def main(args):
             bbox_draw.extend(vehicle_bbox_draw)
             bbox_save.extend(vehicle_bbox_save)
 
-
             # Get all pedestrian bounding boxes
             pedestrians_raw = world.get_actors().filter('*pedestrian*')
             pedestrians = cva_utils.snap_processing(pedestrians_raw, snap)
@@ -160,7 +165,6 @@ def main(args):
 
             bbox_draw.extend(tl_bbox_draw)
             bbox_save.extend(tl_bbox_save)
-
             
             # Getting traffic sign bounding boxes
             traffic_signs = world.get_level_bbs(carla.CityObjectLabel.TrafficSigns)
@@ -222,6 +226,7 @@ def main(args):
         client.apply_batch([carla.command.DestroyActor(x) for x in walkers_list])
         for sensor in sensor_list:
             sensor.destroy()
+        server_utils.stop_carla_server()
         print('done.')
 
 if __name__ == '__main__':

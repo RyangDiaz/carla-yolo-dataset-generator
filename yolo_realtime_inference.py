@@ -9,8 +9,11 @@ from ultralytics import YOLO
 
 import utils.world_utils as world_utils
 import utils.cva_utils as cva_utils
+import utils.server_utils as server_utils
 
 def main(args):
+    server_utils.start_carla_server()
+
     client = carla.Client('localhost', 2000)
     client.set_timeout(5.0)
     client.load_world(args.map)
@@ -89,6 +92,7 @@ def main(args):
         client.apply_batch([carla.command.DestroyActor(x) for x in walkers_list])
         for sensor in sensor_list:
             sensor.destroy()
+        server_utils.stop_carla_server()
         print('done.')
 
 
