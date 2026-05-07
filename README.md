@@ -125,6 +125,31 @@ bbox_utils.object_bbox_depth_semantic(
 ```
 
 For more information on the algorithms used to filter out bounding boxes, check out the [CARLA-2DDBBox](https://github.com/MukhlasAdib/CARLA-2DBBox) repository.
+Roadmap & Planned Enhancements
+To make this dataset generator more robust, production-ready, and developer-friendly, a series of enhancements are planned and currently in development. These improvements focus on resolving underlying CARLA C++ API edge cases, optimizing performance, and standardizing the codebase.
+
+Contributions and code reviews for the following upcoming Pull Requests are highly welcome!
+
+Phase 1: Core Stability & Crash Prevention (In Progress)
+Fix Asynchronous I/O Segfaults: Replace the native image.save_to_disk() with synchronized cv2.imwrite and memory deep-copies to eliminate silent crashes caused by Python GC and CARLA C++ thread memory race conditions.
+
+Robust Actor Initialization: Implement a while-try-except retry pattern to gracefully handle actor spawning collisions in crowded maps, preventing AttributeError during autopilot assignment.
+
+Simulation Lifecycle Management: Re-align the global try-except-finally blocks to guarantee resource cleanup (destroying actors/sensors) upon arbitrary script interruptions, preventing memory leaks and zombie CarlaUE4 processes.
+
+Phase 2: Architecture & Performance Optimization (Planned)
+Scope Refactoring: Correct indentation and functional scoping issues within the main execution loop to ensure seamless data collection resumption after environment resets.
+
+Safe Checkpoint Handling: Refactor the checkpoint I/O logic using atomic writes and specific exception handling (FileNotFoundError) to prevent checkpoint corruption during unexpected crashes.
+
+RPC Server Collision Management: Safely handle background server instances and port collisions (2000/2001) to avoid Out-Of-Memory (OOM) errors during automatic server starts.
+
+Phase 3: Developer Experience (DX) & Standardization (Planned)
+Configurable Sampling Rate: Expose hardcoded variables like save_every as CLI arguments in argparse to allow dynamic dataset sampling densities without modifying source code.
+
+Environment Pre-flight Checks: Implement a fast-fail startup dependency checker to validate CARLA client versions and essential Python libraries before loading heavy Unreal Engine assets.
+
+Codebase Standardization: Integrate the Black formatter and provide .vscode/settings.json recommendations to enforce PEP 8 standards and eliminate indentation-related bugs.
 
 ### Acknowledgements
 
