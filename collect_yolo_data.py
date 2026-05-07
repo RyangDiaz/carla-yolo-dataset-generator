@@ -8,13 +8,18 @@ import random
 from queue import Queue
 from queue import Empty
 import numpy as np
+import time
+import logging
+import argparse
+
 # from pascal_voc_writer import Writer
 import utils.cva_utils as cva_utils
 import utils.world_utils as world_utils
 import utils.img_utils as img_utils
 import utils.bbox_utils as bbox_utils
 import utils.server_utils as server_utils
-import argparse
+
+log = logging.getLogger(__name__)
 
 def get_checkpoint():
     num_save = 0
@@ -30,7 +35,7 @@ def get_checkpoint():
 def retrieve_data(sensor_queue, frame, timeout=5):
     while True:
         try:
-            data = sensor_queue.get(True,timeout)
+            data = sensor_queue.get(True, timeout)
         except Empty:
             return None
         if data.frame == frame:
@@ -45,14 +50,14 @@ def main(args):
     # ==============================================
     # Set up CARLA server
     # ==============================================
-    server_utils.start_carla_server()
+    # server_utils.start_carla_server()  # 禁用自动启动，避免多开导致崩溃
 
     # ==============================================
     # Set up CARLA world
     # ==============================================
 
     client = carla.Client('localhost', 2000)
-    client.set_timeout(5.0)
+    client.set_timeout(20.0) # 给地图加载预留更多时间
     print("Loading world", args.map)
     client.load_world(args.map)
     world  = client.get_world()
@@ -66,8 +71,10 @@ def main(args):
     weather_every = 80
     weather_tick = 20
 
-    try:
+    # 防御性初始化，防止报错
+    actor_list, walkers_list, sensor_list = [], [], []
 
+    try:
         bp_lib = world.get_blueprint_library()
 
         # Set up the simulator in synchronous mode
@@ -79,37 +86,40 @@ def main(args):
         traffic_manager = client.get_trafficmanager()
         traffic_manager.set_synchronous_mode(True)
 
-        actor_list, walkers_list, all_id = world_utils.spawn_actors(client, world, args.num_vehicles, args.num_walkers)
-        vehicle = actor_list[0]
-        sensor_list, q_list, sensor_idxs = world_utils.spawn_sensors(world, vehicle)
-        camera = sensor_list[0]
-
         # Reset simulation if car is stuck
         def reset():
-            # Destroy existing actors
+            actor_list_local = []
+            walkers_list_local = []
+            sensor_list_local = []
             world.apply_settings(original_settings)
             print('destroying actors')
-            client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
-            client.apply_batch([carla.command.DestroyActor(x) for x in walkers_list])
-            for sensor in sensor_list:
+            client.apply_batch([carla.command.DestroyActor(x) for x in actor_list_local])
+            client.apply_batch([carla.command.DestroyActor(x) for x in walkers_list_local])
+            for sensor in sensor_list_local:
                 sensor.destroy()
     
-            # Respawn new actors
-            actor_list, walkers_list, all_id = world_utils.spawn_actors(client, world, args.num_vehicles, args.num_walkers)
-            vehicle = actor_list[0]
-            sensor_list, q_list, sensor_idxs = world_utils.spawn_sensors(world, vehicle)
-            camera = sensor_list[0]
-
-            return actor_list, walkers_list, all_id, vehicle, sensor_list, q_list, sensor_idxs, camera
+            spawn_success = False
+            while not spawn_success:
+                try:
+                    actor_list_local, walkers_list_local, all_id = world_utils.spawn_actors(client, world, args.num_vehicles, args.num_walkers)
+                    vehicle = actor_list_local[0]
+            
+                    sensor_list_local, q_list, sensor_idxs = world_utils.spawn_sensors(world, vehicle)
+                    camera = sensor_list_local[0]
+            
+                    spawn_success = True # 全部成功才退出循环
+                except Exception as e:
+                    log.warning(f"[WARN] 场景初始化失败，正在重试... 错误: {e}")
+                    time.sleep(1)
+            return actor_list_local, walkers_list_local, all_id, vehicle, sensor_list_local, q_list, sensor_idxs, camera
+        
+        # 【关键修复】：调用 reset() 初始化所有变量，你之前不小心把这行删了！
+        actor_list, walkers_list, all_id, vehicle, sensor_list, q_list, sensor_idxs, camera = reset()
 
         traffic_signs = world.get_level_bbs(carla.CityObjectLabel.TrafficSigns)
-        stop_signs = self.world.get_actors().filter('*stop*')
-
+        stop_signs = world.get_actors().filter('*stop*')
+        
         while (not args.save) or (num_saved < args.num_save):
-            # Turn all traffic lights green
-            # for tl in world.get_actors().filter('*traffic_light*'):
-            #     tl.set_state(carla.TrafficLightState.Green)
-
             # Track vehicle velocity to ensure that car isn't stuck
             velocity = vehicle.get_velocity()
             velocity = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) # * 3.6
@@ -122,7 +132,7 @@ def main(args):
             if stop_count == 120:
                 print("Car is stuck! Resetting...")
                 actor_list, walkers_list, all_id, vehicle, sensor_list, q_list, sensor_idxs, camera = reset()
-            
+                
             # Change weather
             if weather_tick == 0 and not args.constant_weather:
                 print("Changing weather...")
@@ -146,7 +156,7 @@ def main(args):
             semantic_image = data[sensor_idxs['semantic']]
 
             img = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
-
+            clean_img = np.copy(img)
             boundingbox_path = os.path.join(output_path, "boundingbox")
             if args.save:
                 if not os.path.exists(boundingbox_path): 
@@ -185,8 +195,8 @@ def main(args):
                 depth_margin=8, 
                 patch_ratio=0.4, 
                 resize_ratio=0.5, 
-                semantic_label=12, # Refer to https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera for semantic labels
-                semantic_threshold=0.3, # The bounding box is included if at least 30% of the semantic labels inside are semantic_label
+                semantic_label=12,
+                semantic_threshold=0.3,
                 class_id=1
             )
             bbox_draw.extend(walker_bbox_draw)
@@ -244,7 +254,7 @@ def main(args):
                 else:
                     num_saved += 1
                     print(f"Saving image {num_saved}")
-                    image.save_to_disk(os.path.join(output_path, args.map + '_' + '%06d.png' % image.frame))
+                    cv2.imwrite(os.path.join(output_path, args.map + '_' + '%06d.png' % image.frame), clean_img)
                     with open(os.path.join(output_path, args.map + '_' + '%06d.txt' % image.frame), "a") as f:
                         f.write(annotation_str)
                 
@@ -257,28 +267,30 @@ def main(args):
                 cv2.imshow('ImageWindowName',img)
                 if cv2.waitKey(1) == ord('q'):
                     break
-    
+
             image_count += 1
 
         print('Data collection finished!')
         if os.path.exists('checkpoint.txt'):
             os.remove('checkpoint.txt')
-
         cv2.destroyAllWindows()
-    
-    except:
-        print('Simulation crashed, saving checkpoint!')
+
+    except Exception as e:
+        print(f"Simulation crashed: {e}")
+        import traceback
+        traceback.print_exc()
         with open('checkpoint.txt', 'w') as f:
-            f.write(num_saved)
+            f.write(str(num_saved))
 
     finally:
         world.apply_settings(original_settings)
         print('destroying actors')
         client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
-        client.apply_batch([carla.command.DestroyActor(x) for x in walkers_list])
+        if 'walkers_list' in locals() and len(walkers_list) > 0:
+            client.apply_batch([carla.command.DestroyActor(x['id']) for x in walkers_list if 'id' in x])
         for sensor in sensor_list:
             sensor.destroy()
-        server_utils.stop_carla_server()
+        # server_utils.stop_carla_server() # 建议先注释掉，免得把你的 Carla 彻底关了
         print('done.')
 
 if __name__ == '__main__':

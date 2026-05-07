@@ -37,7 +37,11 @@ def spawn_actors(client, world, num_vehicles, num_walkers):
     # Get the map spawn points
     spawn_points = world.get_map().get_spawn_points()
     vehicle = world.try_spawn_actor(vehicle_bp, random.choice(spawn_points))
-    # Set up automatic drive
+    # 修复：在调用方法前检查 vehicle 是否生成成功
+    if vehicle is None:
+        # 抛出异常，让外层的 try-except 捕获
+        raise RuntimeError("主车辆生成失败，生成点可能被占用") 
+    
     vehicle.set_autopilot(True)
     # collect all actors to destroy when we quit the script
     actor_list.append(vehicle)
