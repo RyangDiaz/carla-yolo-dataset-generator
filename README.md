@@ -1,135 +1,94 @@
-# Multi-Class Object Localization in CARLA Using YoloV8
+# 基于 CARLA 的 YOLOv8 多类目标定位数据集生成器
 
 ![](example_labels.png)
 
-This repository provides some useful tools to generate a dataset of annotated images for use in training a YOLO object detector. Data collection is done in the [CARLA](https://carla.org//) simulator (v0.9.15), and the YOLOv8 model is trained using the [Ultralytics](https://docs.ultralytics.com) API.
+本仓库提供了一系列实用工具，用于在 [CARLA](https://carla.org//) 模拟器（v0.9.15）中生成带有标注的数据集，以训练 YOLO 目标检测模型。模型训练由 [Ultralytics](https://docs.ultralytics.com) API 提供支持。
 
-## Overview
+## 目录
 
-[Installation](#Installation)  
-[Quick Start](#Quick-Start)  
-[Dataset Customization](#Dataset-Customization)  
-[Acknowledgements](#Acknowledgements)  
+- [安装指南](#安装指南)  
+- [快速开始](#快速开始)  
+- [数据集自定义](#数据集自定义)  
+- [🚀 开发路线图与进阶优化](#开发路线图与进阶优化) *(新增)*
+- [鸣谢](#鸣谢)  
 
-## Installation
+## 安装指南
 
-This code has been tested on:
-- **Ubuntu** 18.04 / 22.04
-- **CARLA** 0.9.15
-- **Python** 3.10.x
+本代码已在以下环境测试通过：
+- **操作系统**: Ubuntu 18.04 / 22.04
+- **CARLA 版本**: 0.9.15
+- **Python 版本**: 3.10.x
 
-### Installing CARLA
-Follow [these](https://carla.readthedocs.io/en/0.9.15/start_quickstart/) instructions to install the CARLA simulation environment. For a quick setup, you may also [run CARLA through Docker](https://carla.readthedocs.io/en/0.9.15/build_docker/).
+### 安装 CARLA
+请参考 [官方说明](https://carla.readthedocs.io/en/0.9.15/start_quickstart/) 安装 CARLA 模拟环境。如需快速部署，也可以尝试 [通过 Docker 运行 CARLA](https://carla.readthedocs.io/en/0.9.15/build_docker/)。
 
-### Setting up Environment
-```
-git clone https://github.com/RyangDiaz/carla-yolo-dataset-generator.git
+### 环境配置
+```bash
+git clone [https://github.com/RyangDiaz/carla-yolo-dataset-generator.git](https://github.com/RyangDiaz/carla-yolo-dataset-generator.git)
 cd carla-yolo-dataset-generator
 conda env create -f environment.yml
 conda activate carla
-```
 
-If not using conda, then
-
-```
+如果不使用 conda，请执行：
 pip install -r requirements.txt
-```
+使用说明
+首先，修改 utils/server_utils.py 中的 LAUNCH_STRING 变量，填入正确的启动路径，以便脚本能自动为你启动 Carla 服务端。
 
-## Usage
-First, modify the `LAUNCH_STRING` variable of `utils/server_utils.py` to the appropriate launch command so that the script can automatically launch a Carla server for you.
+快速开始
+如需自动跨 5 张地图（Town01 到 Town05）生成包含 1250 张图像的数据集，并自动开始训练 YOLOv8 模型，请运行：
 
-### Quick Start
-To automatically generate a dataset of 1250 images (800 train, 200 validation, 250 test) spanning five different maps (`Town01` to `Town05`) and train a YOLOv8 model on this dataset:
-
-```
+Bash
 bash collect_data_and_train.sh
-```
+训练完成后，你可以在指定地图上运行实时推理，并查看或保存视频结果：
 
-You can then run inference on the trained model over `NUM_STEPS` and visualize/save prediction frames as a video:
+Bash
+python yolo_realtime_inference.py --model 路径/到/你的模型.pt --num_steps 步数 --map Town05 --show --save_video
+该检测器目前支持四类目标：vehicle（车辆）、pedestrian（行人）、traffic_light（红绿灯）和 traffic_sign（交通标志）。
 
-```
-python yolo_realtime_inference.py --model PATH/TO/TRAINED/MODEL.pt --num_steps NUM_STEPS --map Town05 --show --save_video
-```
+数据集自定义
+采集参数配置
 
-This trained detector currently has four classes: `vehicle`, `pedestrian`, `traffic_light`, and `traffic_sign`. You can customize the classes of objects annotated by using the bounding box filtering functions provided in this repository (described below).
+你可以通过向 collect_yolo_data.py 传递参数来调整数据集特性：
 
-### Dataset Customization
+--map {MAP}: 指定采集地图。
 
-**Dataset Collection Parameters**
+--constant_weather: 保持固定天气。默认情况下，采集器每隔几帧会切换一次天气。
 
-You can modify the characteristics of your dataset by passing arguments to `collect_yolo_data.py`:
+--num_save {N}: 配合 --save 使用，达到保存 N 张目标图像后停止。
 
-- `--map {MAP}`: The dataset will be collected in the map `MAP` (see a list [here](https://carla.readthedocs.io/en/latest/core_map/#non-layered-maps)).
-- `--constant_weather`: Keeps constant weather during collection. By default, the dataset collector will switch the simulation's weather every few collected frames.
-- `--num_save {N}`: If `--save` is passed in, the dataset collector will run until `N` frames have been collected.
-- `--num_detections_save {N}`: Each collected frame will have a minimum of `N` bounding boxes (across all classes).
+--num_detections_save {N}: 每一张保存的图像至少包含 N 个有效标注框。
 
-After data collection, use `convert_dataset.py` to transform the collected dataset into a format compatible with the YOLO model trainer. Use `train_yolo.py` to run the training script.
+开发路线图与进阶优化
+为了使该数据集生成器更具鲁棒性、达到工业级标准并对开发者更加友好，本项目计划进行一系列进阶优化。这些改进专注于解决 CARLA 底层 C++ API 的边界错误、优化内存安全及标准化工程代码。
 
-**Adding New Classes**
+非常欢迎社区对以下即将提交的 Pull Request (PR) 方向进行代码审查与贡献：
 
-To add new classes of actors/objects for annotation, modify the `collect_yolo_data.py` file by adding one of the functions from `utils/bbox_utils.py` depending on if your class involves actors or level objects in the CARLA simulation. Follow the pattern shown in `collect_yolo_data.py`. Additionally, be sure to modify the `carla.yaml` configuration file with your new classes/labels so that the YOLO model can predict them.
+阶段 1：核心稳定性与崩溃防护（开发中）
+修复异步 I/O 导致的静默崩溃: 废弃原生的 image.save_to_disk() 方法，改用带有内存深拷贝的同步 cv2.imwrite。此举旨在消除 Python 垃圾回收机制与 CARLA C++ 异步写盘线程之间的内存竞态（Race Condition），解决无报错闪退问题。
 
-Bounding box filtering of non-occluded actors (such as vehicles and pedestrians) can be done in two ways: lidar-based filtering or depth/semantic-based filtering:
+健壮的 Actor 生成逻辑: 在 reset() 生命周期中引入 while-try-except 重试模式。这能有效处理在拥挤地图中生成点冲突导致的 NoneType 报错，确保自动驾驶逻辑（Autopilot）始终能成功分配。
 
-*Lidar-Based Actor Bounding Box Filtering*
+仿真生命周期管理: 重新梳理全局 try-except-finally 结构。确保在脚本因任何原因中断时，都能强制执行资源清理逻辑，避免产生僵尸进程或显存泄漏。
 
-```
-bbox_utils.actor_bbox_lidar(
-    actor_list, # List of filtered actors (probably from world.get_actors().filter('FILTER'))
-    camera, # RGB camera from environment
-    image, # carla.Image taken from RGB camera
-    lidar_image, # carla.SemanticLidarMeasurement taken from lidar sensor
-    max_dist, # Maximum distance to annotate away from ego vehicle
-    min_detect, # Argument for cva_utils.auto_annotate_lidar
-    class_id # Integer label for YOLO classifier
-)
-```
+阶段 2：架构重构与性能优化（计划中）
+作用域逻辑重构: 修正主执行循环的缩进与作用域错误。确保在环境重置（Reset）后，数据采集、天气切换及边界框计算逻辑能正确恢复运行。
 
-*Semantic/Depth-Based Actor Bounding Box Filtering*
+安全存档机制: 重构 checkpoint 读写逻辑，引入原子化写入（Atomic Write）并精确捕获文件异常，防止因意外断电或程序崩溃导致的进度文件损坏。
 
-```
-bbox_utils.actor_bbox_depth_semantic(
-    actor_list, # List of filtered actors (probably from world.get_actors().filter('FILTER'))
-    camera, # RGB camera from environment
-    image, # carla.Image taken from RGB camera
-    semantic_image, # carla.Image taken from semantic segmentation camera
-    depth_image, # Depth reading in meters obtained from cva_utils.extract_depth(depth_image)
-    max_dist, # Maximum distance to annotate away from ego vehicle
-    depth_margin, # Argument for cva_utils.auto_annotate
-    patch_ratio, # Argument for cva_utils.auto_annotate_lidar
-    resize_ratio, # Argument for cva_utils.auto_annotate_lidar
-    semantic_label, # Integer semantic label from semantic_image corresponding to desired class
-    semantic_threshold, # Minimum semantic label threshold for bounding box filter
-    class_id # Integer label for YOLO classifier
-)
-```
+服务端冲突处理: 增加 RPC 端口（2000/2001）占用检测。自动识别已运行的仿真器实例，避免多开 CarlaUE4.exe 导致的显存溢出（OOM）。
 
-Bounding box filtering of non-occluded level objects (such as traffic lights and traffic signs) is done through depth/semantic-based filtering:
+阶段 3：开发者体验 (DX) 与标准化（计划中）
+动态采样率配置: 将硬编码的 save_every 等核心变量提取至命令行参数（argparse）。开发者无需修改源码即可灵活调整测试与正式采集的频率。
 
-*Semantic/Depth-Based Object Bounding Box Filtering*
+环境预检机制: 增加启动前的依赖自检模块。在加载沉重的 Unreal 资源前，提前验证 CARLA 客户端版本及核心 Python 库的兼容性。
 
-```
-bbox_utils.object_bbox_depth_semantic(
-    bbox_list, # List of filtered bounding boxes (probably from world.get_level_bbs(FILTER))
-    camera, # RGB camera from environment
-    image, # carla.Image taken from RGB camera
-    semantic_image, # carla.Image taken from semantic segmentation camera
-    depth_image, # Depth reading in meters obtained from cva_utils.extract_depth(depth_image)
-    vehicle, # Ego vehicle from simulation
-    max_dist, # Maximum distance to annotate away from ego vehicle
-    semantic_label, # Integer semantic label from semantic_image corresponding to desired class
-    semantic_threshold, # Minimum semantic label threshold for bounding box filter
-    class_id # Integer label for YOLO classifier
-)
-```
+代码工程化标准: 集成 Black 格式化工具并提供推荐的 .vscode 设置，从工程基建层面杜绝因缩进问题导致的逻辑 Bug。
 
-For more information on the algorithms used to filter out bounding boxes, check out the [CARLA-2DDBBox](https://github.com/MukhlasAdib/CARLA-2DBBox) repository.
+鸣谢
+本项目工具基于以下 CARLA 数据集采集领域的优秀工作构建：
 
-### Acknowledgements
+CARLA-2DDBBox
 
-The tools in this repo were built off of work done previously in CARLA dataset collection for object detection tasks:
+CARLA-Automatic-Dataset-Collector
 
-- [CARLA-2DDBBox](https://github.com/MukhlasAdib/CARLA-2DBBox)
-- [CARLA-Automatic-Dataset-Collector](https://github.com/LinkouCommander/CARLA-Automatic-Dataset-Collector)
-- [Bounding box tutorial provided by CARLA](https://carla.readthedocs.io/en/latest/tuto_G_bounding_boxes/)
+CARLA 官方边界框教程

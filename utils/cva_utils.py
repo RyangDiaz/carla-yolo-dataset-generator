@@ -49,7 +49,13 @@ def auto_annotate_lidar(vehicles, camera, lidar_data, max_dist = 100, min_detect
     
     visible_id, idx_counts = np.unique([p.object_idx for p in filtered_data], return_counts=True)
     visible_vehicles = [v for v in vehicles if v.id in visible_id]
-    visible_vehicles = [v for v in vehicles if idx_counts[(visible_id == v.id).nonzero()[0]] >= min_detect]
+    visible_vehicles = []
+    for v in vehicles:
+            # 找到匹配 ID 的索引位置
+            indices = (visible_id == v.id).nonzero()[0]
+            # 只有当索引不为空，且检测到的点数达标时才加入列表
+            if indices.size > 0 and idx_counts[indices[0]] >= min_detect:
+                visible_vehicles.append(v)
     bounding_boxes_2d = [get_2d_bb(vehicle, camera) for vehicle in visible_vehicles]
     
     filtered_out = {}
@@ -568,7 +574,8 @@ def save2darknet(bboxes, vehicle_class, carla_img, data_path = '', cc_rgb = carl
 ### Use this function to convert depth image (carla.Image) to a depth map in meter
 def extract_depth(depth_img):
     depth_img.convert(carla.ColorConverter.Depth)
-    depth_meter = np.array(depth_img.raw_data).reshape((depth_img.height,depth_img.width,4))[:,:,0] * 1000 / 255
+    # 修复：先转换为 float32 避免 uint8 乘法溢出
+    depth_meter = np.array(depth_img.raw_data).astype(np.float32).reshape((depth_img.height,depth_img.width,4))[:,:,0] * 1000 / 255
     return depth_meter
 
 ### Use this function to get vehciles' snapshots that can be processed by auto_annotate() function.
